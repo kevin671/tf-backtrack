@@ -59,5 +59,5 @@ dataset = CountDownDataset(json_file_path)
 # 動作確認
 for i in range(len(dataset)):
     x, y = dataset[i]
-    print(x.shape, y.shape) # 
+    print(x.shape, y.shape) # torch.Size([5]) torch.Size([15])
     print(f"Input (nums): {x.numpy()}, Output (solution steps): {y.numpy()}")
