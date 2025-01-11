@@ -1,0 +1,3 @@
+[submodule "src/dataset/neurosat/PyMiniSolvers"]
+	path = src/dataset/neurosat/PyMiniSolvers
+	url = https://github.com/liffiton/PyMiniSolvers.git
