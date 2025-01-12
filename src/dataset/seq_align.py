@@ -74,19 +74,14 @@ class SequenceAlignmentDataset(Dataset):
             dictionary[alphabet[i]] = i + len(dictionary)
         for i in range(num_range):
             dictionary[str(i)] = i + len(dictionary) + len(alphabet)
-        debug_size = 100
 
-        file_name = args.file
+        file_name = args.data_dir
         if control == 0:
             with open(f"{file_name}/train.txt", "r") as f:
                 self.X = f.read().splitlines()
-                if args.debug:
-                    self.X = self.X[:debug_size]
         elif control == 1:
             with open(f"{file_name}/test.txt", "r") as f:
                 self.X = f.read().splitlines()
-                if args.debug:
-                    self.X = self.X[:debug_size]
 
         def toToken(sentences):
             token_list = list()
@@ -102,23 +97,24 @@ class SequenceAlignmentDataset(Dataset):
         def getY(X):
             Y = X[:, 1:] * 1
             b = Y.shape[0]
-            equa = torch.argmax(torch.where(Y == dictionary["<sep>"], 1, 0), dim=1)
+            # equa = torch.argmax(torch.where(Y == dictionary["<sep>"], 1, 0), dim=1)
             eos = torch.argmax(torch.where(Y == dictionary["<eos>"], 1, 0), dim=1)
             for i in range(b):
-                Y[i, : equa[i] + 1] = 0
+                # Y[i, : equa[i] + 1] = 0
+                Y[i, : eos[i]] = 0  # TODO: may be wrong
                 Y[i, eos[i] + 1 :] = 0
             return Y
 
         self.X = toToken(self.X)
         self.Y = getY(self.X).long()
         self.X = self.X[:, :-1]
-        self.Z = torch.argmax(torch.where(self.X == dictionary["<sep>"], 1, 0), dim=1)
+        # self.Z = torch.argmax(torch.where(self.X == dictionary["<sep>"], 1, 0), dim=1)
 
     def __len__(self):
         return len(self.X)
 
     def __getitem__(self, idx):
-        return self.X[idx], self.Y[idx], self.Z[idx]
+        return self.X[idx], self.Y[idx]  # , self.Z[idx]
 
 
 def getLoader(args):
@@ -148,23 +144,25 @@ if __name__ == "__main__":
     import os
 
     parser = argparse.ArgumentParser(description="Sequence Alignment")
-    parser.add_argument("--length", type=int, default=10)
+    parser.add_argument("--length", type=int, default=40)
     parser.add_argument("--using", type=int, default=26)
-    parser.add_argument("--train_size", type=float, default=1e2)
-    parser.add_argument("--test_size", type=float, default=1e2)
-    parser.add_argument("--save_dir", type=str, default="data/seq_align")
+    parser.add_argument("--train_size", type=float, default=1e5)
+    parser.add_argument("--test_size", type=float, default=1e3)
+    parser.add_argument("--save_dir", type=str, default="data/ED")
     args = parser.parse_args()
 
-    os.makedirs(args.save_dir, exist_ok=True)
+    # out_dir: data/seq_align/{args.length}
+    out_dir = f"{args.save_dir}/{args.length}"
+    os.makedirs(out_dir, exist_ok=True)
 
-    with open(f"{args.save_dir}/train.txt", "w") as f:
+    with open(f"{out_dir}/train.txt", "w") as f:
         for _ in range(int(args.train_size)):
             str1, str2 = get_seq(0, args)
             ans = solve(str1, str2)
             line = f"{' '.join(str1)} | {' '.join(str2)} <sep> {ans}\n"
             f.write(line)
 
-    with open(f"{args.save_dir}/test.txt", "w") as f:
+    with open(f"{out_dir}/test.txt", "w") as f:
         for _ in range(int(args.test_size)):
             str1, str2 = get_seq(0, args)
             ans = solve(str1, str2)
