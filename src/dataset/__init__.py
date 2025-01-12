@@ -4,11 +4,14 @@ from torch.utils.data import DataLoader
 from dataset.countdown import CountDownDataset
 from dataset.sat import SATDataset
 from dataset.seq_align import SequenceAlignmentDataset
+from dataset.sudoku import SudokuDataset
 
 
 def get_dataset(args, i):
     if args.dataset_name == "countdown":
         return CountDownDataset(args, i)
+    elif args.dataset_name == "sudoku":
+        return SudokuDataset(args, i)
     elif args.dataset_name == "sat":
         return SATDataset(args)
     elif args.dataset_name == "ED":

@@ -45,9 +45,14 @@ class Trainer:
                 inputs, y = batch
                 inputs, y = inputs.cuda(), y.cuda()
                 logits = model(inputs)
-                # TODO: loss for all logits in the loop
-                logits = logits[-1]  # (batch_size, seq_len, vocab_size)
-                loss = self.criterion(logits.transpose(1, 2), y)
+                if args.dataset_name == "sudoku":
+                    loss = 0.0
+                    for logit in logits:
+                        loss += self.criterion(logit.transpose(1, 2), y)
+                    loss /= len(logits)
+                else:
+                    logit = logits[-1]  # (batch_size, seq_len, vocab_size)
+                    loss = self.criterion(logit.transpose(1, 2), y)
                 loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
