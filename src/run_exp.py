@@ -6,7 +6,7 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from transformers import get_scheduler, set_seed
 
-from dataset.seq_align import getLoader
+from dataset import get_loader
 from model import LoopedTransformer
 from trainer import Trainer
 
@@ -28,7 +28,7 @@ def main():
         # TODO: load optimizer and scheduler
         model = LoopedTransformer.load_from_checkpoint(args.checkpoint_path).cuda()
 
-    train_loader, test_loader = getLoader(args)  # TODO: Support different datasets
+    train_loader, test_loader = get_loader(args)  # TODO: Support different datasets
     optimizer = model.configure_optimizers(
         weight_decay=args.weight_decay,
         learning_rate=args.lr,

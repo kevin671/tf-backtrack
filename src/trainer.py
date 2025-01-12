@@ -22,7 +22,7 @@ class Trainer:
                 # checkpoint_path: "/work/gg45/g45004/parallel-looped-tf/output/ED_60_Loop_100/wvs7wzm0/epoch_40.pt"
                 run_id = args.checkpoint_path.split("/")[-2]
                 wandb.init(
-                    project="timestep",
+                    project="backtrack",
                     config=args,
                     name=args.wandb_name,
                     id=run_id,
@@ -30,7 +30,7 @@ class Trainer:
                 )
 
             else:
-                wandb.init(project="timestep", config=args, name=args.wandb_name)
+                wandb.init(project="backtrack", config=args, name=args.wandb_name)
 
     def train(self):
         model, args = self.model, self.args
@@ -45,26 +45,49 @@ class Trainer:
                 inputs, y = batch
                 inputs, y = inputs.cuda(), y.cuda()
                 logits = model(inputs)
-                logits = logits[-1]
+                # TODO: loss for all logits in the loop
+                logits = logits[-1]  # (batch_size, seq_len, vocab_size)
                 loss = self.criterion(logits.transpose(1, 2), y)
                 loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
                 total_loss += loss.item()
 
-                if i % args.log_interval == 0 and i > 0:
-                    wandb.log({"loss": total_loss / args.log_interval})
+                if (i + 1) % args.log_interval == 0 and dist.get_rank() == 0:
+                    loss = total_loss / args.log_interval
+                    print(f"Epoch {epoch} Iter {i} Loss {loss}")
+                    wandb.log({"loss": loss})
+                    wandb.log({"lr": self.scheduler.get_last_lr()[0]})
                     total_loss = 0
 
-            acc = 0.0
+            Sum, correct = 0, 0
             model.eval()
             with torch.no_grad():
                 for i, batch in enumerate(self.test_loader):
-                    batch = {k: v.to(self.device) for k, v in batch.items()}
-                    logits = model(batch["input_ids"])
-                    acc += (logits.argmax(1) == batch["labels"]).float().mean().item()
-            acc /= len(self.test_loader)
-            wandb.log({"acc": acc})
+                    # batch = {k: v.to(self.device) for k, v in batch.items()}
+                    # logits = model(batch["input_ids"])
+                    # acc += (logits.argmax(1) == batch["labels"]).float().mean().item()
+                    inputs, y = batch
+                    inputs, y = inputs.cuda(), y.cuda()
+                    logits = model(inputs)
+                    logits = logits[-1]
+                    Sum += torch.as_tensor(inputs.shape[0]).cuda()
+                    truth = torch.where(y > 0, 1, 0)
+                    predict = (
+                        torch.where(torch.argmax(logits, dim=2) == y, 1, 0) * truth
+                    )
+                    correct += torch.sum(
+                        torch.where(
+                            torch.sum(truth, dim=1) == torch.sum(predict, dim=1), 1, 0
+                        )
+                    )
+
+            dist.all_reduce(Sum)
+            dist.all_reduce(correct)
+            acc = correct / Sum
+            if dist.get_rank() == 0:
+                print(f"Epoch {epoch} Acc {acc}")
+                wandb.log({"acc": acc})
 
     def save_checkpoint(self, path):
         torch.save(self.model.state_dict(), path)
