@@ -14,7 +14,7 @@ OUTPUT_DIR=${ROOT_DIR}"/output/$(basename "$TASK")_"${COMPLEXITY}"/"${MODEL}"_"$
 WANDB_NAME=$TASK"_"${COMPLEXITY}"_"${MODEL}"_"${LOOP}
 
 cd src
-torchrun --standalone --nproc_per_node=1 run_exp.py\
+torchrun --standalone --nproc_per_node=2 run_exp.py\
  --dataset_name ${TASK}\
  --data_dir ${DATA_DIR}\
  --file_name ${FILE_NAME}\
