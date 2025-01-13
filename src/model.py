@@ -7,6 +7,30 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 
+class PositionalTimestepEncoding(nn.Module):
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 500):
+        super().__init__()
+        # generate position encoding as in [Vaswani et al., 2017]
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2) * (-math.log(10_000.0) / d_model)
+        )
+        pe = torch.zeros(1, max_len, d_model)
+        pe[0, :, 0::2] = torch.sin(position * div_term)
+        pe[0, :, 1::2] = torch.cos(position * div_term)
+        self.register_buffer("pe", pe)
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x: torch.Tensor, time_step: int):
+        """
+        Args:
+            x: Has shape [batch_size, seq_len, embedding_dim]
+        """
+        x = x + self.pe[:, : x.size(1)]
+        x = x + self.pe[:, time_step]
+        return self.dropout(x)
+
+
 class LayerNorm(nn.Module):
     """LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False"""
 
@@ -49,7 +73,7 @@ class SelfAttention(nn.Module):
                 ),
             )
 
-    def forward(self, x):
+    def forward(self, x, key_padding_mask=None):
         B, T, C = (
             x.size()
         )  # batch size, sequence length, embedding dimensionality (n_embd)
@@ -68,16 +92,25 @@ class SelfAttention(nn.Module):
 
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         if self.flash:
+            # Convert key_padding_mask into attn_mask
+            # apply the same mask across the query positions.
+            if key_padding_mask is not None:
+                attn_mask = key_padding_mask[:, None, None, :].float()
+                attn_mask = attn_mask.masked_fill(attn_mask == 1, float("-inf"))
+            else:
+                attn_mask = None
+
             # efficient attention using Flash Attention CUDA kernels
             y = torch.nn.functional.scaled_dot_product_attention(
                 q,
                 k,
                 v,
-                attn_mask=None,
+                attn_mask=attn_mask,
                 dropout_p=self.dropout if self.training else 0,
                 is_causal=self.is_causal,  # True,
             )
         else:
+            raise NotImplementedError("Flash Attention is not supported yet")
             # manual implementation of attention
             att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
             if self.is_causal:
@@ -120,8 +153,8 @@ class Block(nn.Module):
         self.ln_2 = LayerNorm(config.n_embd, bias=config.bias)
         self.mlp = MLP(config)
 
-    def forward(self, x):
-        x = x + self.attn(self.ln_1(x))
+    def forward(self, x, key_padding_mask=None):
+        x = x + self.attn(self.ln_1(x), key_padding_mask=key_padding_mask)
         x = x + self.mlp(self.ln_2(x))
         return x
 
@@ -142,6 +175,7 @@ class GPTConfig:
         False  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     )
     is_causal: bool = False  # auto-regressive or not
+    use_key_padding_mask: bool = False  # whether to use key padding mask for attention
 
 
 class LoopedTransformer(nn.Module):
@@ -150,11 +184,15 @@ class LoopedTransformer(nn.Module):
         assert config.vocab_size is not None
         assert config.block_size is not None
         self.config = config
+        self.use_key_padding_mask = config.use_key_padding_mask
 
         self.transformer = nn.ModuleDict(
             dict(
                 wte=nn.Embedding(config.vocab_size, config.n_embd),
-                wpe=nn.Embedding(config.block_size, config.n_embd),
+                # wpe=nn.Embedding(config.block_size, config.n_embd),
+                pos_enc=PositionalTimestepEncoding(
+                    config.n_embd, config.dropout, config.block_size
+                ),
                 drop=nn.Dropout(config.dropout),
                 h=nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
                 ln_f=LayerNorm(config.n_embd, bias=config.bias),
@@ -184,22 +222,30 @@ class LoopedTransformer(nn.Module):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward(self, idx, targets=None):
-        device = idx.device
+        # device = idx.device
         b, t = idx.size()
+
+        if self.use_key_padding_mask:
+            key_padding_mask = idx == 0  # (b, t)
+        else:
+            key_padding_mask = None
+
         assert (
             t <= self.config.block_size
         ), f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
-        pos = torch.arange(0, t, dtype=torch.long, device=device)  # shape (t)
+        # pos = torch.arange(0, t, dtype=torch.long, device=device)  # shape (t)
 
         # forward the GPT model itself
         tok_emb = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
-        pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (t, n_embd)
-        x = self.transformer.drop(tok_emb + pos_emb)
+        x = self.transformer.drop(tok_emb)
+        # pos_emb = self.transformer.wpe(pos)  # position embeddings of shape (t, n_embd)
+        # x = self.transformer.drop(tok_emb + pos_emb)
 
         logits = []
-        for _ in range(self.config.n_loop):
+        for t in range(self.config.n_loop):
+            x = self.transformer.pos_enc(x, t)
             for block in self.transformer.h:
-                x = block(x)
+                x = block(x, key_padding_mask=key_padding_mask)
             logits.append(self.lm_head(self.transformer.ln_f(x)))
 
         # logits = self.lm_head(x)

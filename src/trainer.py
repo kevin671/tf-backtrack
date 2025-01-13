@@ -45,11 +45,13 @@ class Trainer:
                 inputs, y = batch
                 inputs, y = inputs.cuda(), y.cuda()
                 logits = model(inputs)
-                if args.dataset_name == "sudoku":
-                    loss = 0.0
-                    for logit in logits:
-                        loss += self.criterion(logit.transpose(1, 2), y)
-                    loss /= len(logits)
+                if args.dataset_name in {"sudoku", "countdown", "sat"}:
+                    logits = torch.stack(logits)
+                    logits = logits.permute(1, 0, 2, 3)
+                    loss = self.criterion(
+                        logits.reshape(-1, logits.size(-1)),
+                        y.unsqueeze(1).expand(-1, logits.size(1), -1).reshape(-1),
+                    )
                 else:
                     logit = logits[-1]  # (batch_size, seq_len, vocab_size)
                     loss = self.criterion(logit.transpose(1, 2), y)

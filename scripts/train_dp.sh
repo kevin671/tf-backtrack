@@ -1,5 +1,6 @@
 ROOT_DIR="/work/gg45/g45004/tf-backtrack/data" 
 
+TASK="ED"
 COMPLEXITY=40 # 60 # 100 
 LEN_OF_FIRST_STRING=${COMPLEXITY}
 DATA_DIR=${ROOT_DIR}"/ED/"${LEN_OF_FIRST_STRING}
@@ -11,13 +12,14 @@ VOCAB_SIZE=$((NUM_RANGE + 31))
 
 MODEL="LoopedTransformer"
 LAYER=1
-LOOP=10
+LOOP=20
 
 OUTPUT_DIR=${ROOT_DIR}"/output/$(basename "$TASK")_"${COMPLEXITY}"/"${MODEL}"_"${LOOP}
-WANDB_NAME="$(basename "$TASK")_"${COMPLEXITY}"_"${MODEL}"_"${LOOP}
+WANDB_NAME="$(basename "$TASK")_"${COMPLEXITY}"_"${MODEL}"_"${LAYER}"_"${LOOP}
 
 cd src
-torchrun --standalone --nproc_per_node=1 run_exp.py\
+torchrun --standalone --nproc_per_node=2 run_exp.py\
+ --dataset_name ${TASK}\
  --data_dir ${DATA_DIR}\
  --output_dir ${OUTPUT_DIR}\
  --wandb_name ${WANDB_NAME}\
@@ -28,13 +30,13 @@ torchrun --standalone --nproc_per_node=1 run_exp.py\
  --weight_decay 0.01\
  --lr 1e-4\
  --dropout 0.0\
- --batch_size 64\
+ --batch_size 32\
  --epoch 100\
- --warmup 5\
  --n_embd 256\
  --n_head 4\
  --n_layer ${LAYER}\
  --n_loop ${LOOP}\
+ --use_key_padding_mask \
 
 # --folder ${TASK}\
 # --model ${MODEL}\

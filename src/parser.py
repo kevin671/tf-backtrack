@@ -21,7 +21,8 @@ def parse_train_args(args: Optional[Dict[str, Any]] = None):
     parser.add_argument("--n_loop", type=int, default=12)
     parser.add_argument("--dropout", type=float, default=0.0)
     parser.add_argument("--bias", type=bool, default=False)
-    parser.add_argument("--is_causal", type=bool, default=False)
+    parser.add_argument("--is_causal", action="store_true")
+    parser.add_argument("--use_key_padding_mask", action="store_true")
 
     # Dataset config
     parser.add_argument(
@@ -50,7 +51,7 @@ def parse_train_args(args: Optional[Dict[str, Any]] = None):
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--log_interval", type=int, default=100)
     parser.add_argument("--weight_decay", type=float, default=0.0)
-    parser.add_argument("--warmup", type=int, default=0)
+    parser.add_argument("--warmup", type=int, default=1000)
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.999)
 

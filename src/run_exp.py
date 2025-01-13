@@ -36,7 +36,7 @@ def main():
         device_type="cuda",
     )
     scheduler = get_scheduler(
-        name="linear",
+        name="cosine",
         optimizer=optimizer,
         num_warmup_steps=args.warmup,
         num_training_steps=args.epochs * len(train_loader),

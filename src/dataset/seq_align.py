@@ -62,13 +62,13 @@ def solve(str1, str2):
 import torch
 
 ### Dataset Class for Sequence Alignment
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 
 
 class SequenceAlignmentDataset(Dataset):
     def __init__(self, args, control):
         num_range = args.num_range
-        dictionary = {"<pad>": 0, "<sep>": 1, "<eos>": 2, "|": 3, ",": 4}
+        dictionary = {"<pad>": 0, "<sep>": 1, "<eos>": 2, "|": 3, "[CLS]": 4}
         alphabet = "abcdefghijklmnopqrstuvwxyz"
         for i in range(26):
             dictionary[alphabet[i]] = i + len(dictionary)
@@ -85,29 +85,24 @@ class SequenceAlignmentDataset(Dataset):
 
         def toToken(sentences):
             token_list = list()
+            y_list = list()
             for sentence in sentences:
                 # remove the last answer token
-                sentence = sentence.split("<sep>")[0]
-                arr = [dictionary[s] for s in sentence.split()] + [2]
+                #  l j y k p r k y l p p k l y y j k j z r j r p z r <sep> 67
+                parts = sentence.split("<sep>")
+                sentence = parts[0]
+                ans = int(parts[1].strip())
+                arr = [4] + [dictionary[s] for s in sentence.split()]
                 padding = [0 for _ in range(args.maxlen - len(arr))]
                 arr = arr + padding
+                y = [ans] + [0 for _ in range(args.maxlen - 1)]
                 token_list.append(torch.Tensor(arr))
-            return torch.stack(token_list).int()
+                y_list.append(torch.Tensor(y))
+            return torch.stack(token_list).int(), torch.stack(y_list).long()
 
-        def getY(X):
-            Y = X[:, 1:] * 1
-            b = Y.shape[0]
-            # equa = torch.argmax(torch.where(Y == dictionary["<sep>"], 1, 0), dim=1)
-            eos = torch.argmax(torch.where(Y == dictionary["<eos>"], 1, 0), dim=1)
-            for i in range(b):
-                # Y[i, : equa[i] + 1] = 0
-                Y[i, : eos[i]] = 0  # TODO: may be wrong
-                Y[i, eos[i] + 1 :] = 0
-            return Y
-
-        self.X = toToken(self.X)
-        self.Y = getY(self.X).long()
-        self.X = self.X[:, :-1]
+        self.X, self.Y = toToken(self.X)
+        # self.Y = getY(self.X).long()
+        # self.X = self.X[:, :-1]
         # self.Z = torch.argmax(torch.where(self.X == dictionary["<sep>"], 1, 0), dim=1)
 
     def __len__(self):
@@ -115,28 +110,6 @@ class SequenceAlignmentDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.X[idx], self.Y[idx]  # , self.Z[idx]
-
-
-def getLoader(args):
-    number = 2
-    datasets = [SequenceAlignmentDataset(args, i) for i in range(number)]
-    samplers = [
-        torch.utils.data.distributed.DistributedSampler(datasets[i])
-        for i in range(number)
-    ]
-    dataloaders = [
-        DataLoader(
-            datasets[i],
-            batch_size=args.batch_size,
-            shuffle=False,
-            num_workers=10,
-            drop_last=False,
-            sampler=samplers[i],
-            pin_memory=True,
-        )
-        for i in range(number)
-    ]
-    return dataloaders[0], dataloaders[1]
 
 
 if __name__ == "__main__":
