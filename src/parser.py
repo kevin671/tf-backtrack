@@ -29,7 +29,7 @@ def parse_train_args(args: Optional[Dict[str, Any]] = None):
         "--dataset_name",
         type=str,
         required=True,
-        choices=["sudoku", "countdown", "sat", "maze", "ED"],
+        choices=["sudoku", "countdown", "sat", "maze", "ED", "regex"],
     )
     parser.add_argument(
         "--data_dir",
@@ -51,7 +51,7 @@ def parse_train_args(args: Optional[Dict[str, Any]] = None):
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--log_interval", type=int, default=100)
     parser.add_argument("--weight_decay", type=float, default=0.0)
-    parser.add_argument("--warmup", type=int, default=1000)
+    parser.add_argument("--warmup", type=int, default=10000)
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.999)
 

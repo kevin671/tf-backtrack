@@ -1,19 +1,17 @@
 """
 Script for  generating data for the countdown task.
 """
-import json
 import argparse
-import random
-import tiktoken
+import json
 import os
+import random
 
+import tiktoken
 import tqdm
-
 from countdown import CountDown
-from countdown_utils import *
 from countdown_bfs import bfs
 from countdown_dfs import dfs
-
+from countdown_utils import *
 
 parser = argparse.ArgumentParser()
 
@@ -129,10 +127,10 @@ if __name__ == "__main__":
                 "nums": nums,
                 "target": target,
                 "solution": solution,
-                "search_path": search_path,
+                # "search_path": search_path,
                 "rating": rating,
                 "search_type": search_type,
-                "optimal_path": no_backtrack_trace,
+                # "optimal_path": no_backtrack_trace,
                 "heuristic": heuristic.__name__
             })
             enc = tiktoken.get_encoding("cl100k_base")

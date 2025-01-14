@@ -92,10 +92,14 @@ class SequenceAlignmentDataset(Dataset):
                 parts = sentence.split("<sep>")
                 sentence = parts[0]
                 ans = int(parts[1].strip())
-                arr = [4] + [dictionary[s] for s in sentence.split()]
+                arr = [dictionary[s] for s in sentence.split()]
                 padding = [0 for _ in range(args.maxlen - len(arr))]
+                y = (
+                    [0 for _ in range(len(arr) - 1)]
+                    + [ans]
+                    + [0 for _ in range(args.maxlen - len(arr))]
+                )
                 arr = arr + padding
-                y = [ans] + [0 for _ in range(args.maxlen - 1)]
                 token_list.append(torch.Tensor(arr))
                 y_list.append(torch.Tensor(y))
             return torch.stack(token_list).int(), torch.stack(y_list).long()
@@ -117,9 +121,9 @@ if __name__ == "__main__":
     import os
 
     parser = argparse.ArgumentParser(description="Sequence Alignment")
-    parser.add_argument("--length", type=int, default=40)
+    parser.add_argument("--length", type=int, default=80)
     parser.add_argument("--using", type=int, default=26)
-    parser.add_argument("--train_size", type=float, default=1e5)
+    parser.add_argument("--train_size", type=float, default=1e6)
     parser.add_argument("--test_size", type=float, default=1e3)
     parser.add_argument("--save_dir", type=str, default="data/ED")
     args = parser.parse_args()
@@ -135,9 +139,13 @@ if __name__ == "__main__":
             line = f"{' '.join(str1)} | {' '.join(str2)} <sep> {ans}\n"
             f.write(line)
 
+    print("Train data for edit distance is generated.")
+
     with open(f"{out_dir}/test.txt", "w") as f:
         for _ in range(int(args.test_size)):
             str1, str2 = get_seq(0, args)
             ans = solve(str1, str2)
             line = f"{' '.join(str1)} | {' '.join(str2)} <sep> {ans}\n"
             f.write(line)
+
+    print("Test data for edit distance is generated.")

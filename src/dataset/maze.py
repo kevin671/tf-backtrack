@@ -1,13 +1,12 @@
 import heapq
 import json
+import os
 
 import numpy as np
 
-FILE_PATH = "/work/gg45/g45004/tf-backtrack/data/maze_dataset.json"
-
 
 # Generate a dataset of maze navigation tasks with 81-character strings for input and solution
-def generate_maze_dataset(num_samples, n, num_walls_range):
+def generate_maze_dataset(num_samples, n, num_walls_range, file_path):
     """
     Generates a dataset of maze navigation tasks in a seq-to-seq format.
     Args:
@@ -22,9 +21,9 @@ def generate_maze_dataset(num_samples, n, num_walls_range):
     for _ in range(num_samples):
 
         solution_path = None
-
+        distance = 0
         # 迷路を生成して、解が見つかるまで繰り返し生成
-        while solution_path is None:
+        while solution_path is None or distance <= n:
             # ランダムな start と goal を生成（同じ位置にならないようにする）
             while True:
                 start = (np.random.randint(0, n), np.random.randint(0, n))
@@ -75,7 +74,8 @@ def generate_maze_dataset(num_samples, n, num_walls_range):
             {"maze": maze_string, "solution": solved_maze_string, "distance": distance}
         )
 
-    with open(FILE_PATH, "w") as f:
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(file_path, "w") as f:
         json.dump(data, f)
 
 
@@ -144,7 +144,11 @@ from torch.utils.data import Dataset
 
 
 class MazeDataset(Dataset):
-    def __init__(self, file_path=FILE_PATH):
+    def __init__(self, args, control):
+        file_path = os.path.join(args.data_dir, args.file_name)
+        if control == 1:
+            file_path = file_path.replace("train", "test")
+
         with open(file_path, "r") as f:
             self.data = json.load(f)
 
@@ -163,16 +167,34 @@ class MazeDataset(Dataset):
 
 
 if __name__ == "__main__":
-    generate_maze_dataset(
-        1, 5, (2, 10)
-    )  # 回答は複数あり得るか、でもA*は決定的だからdetermisticではある
+    complexity = 9
+    wall_density = [0.2, 0.6]
+    num_walls_range = (
+        int(complexity**2 * wall_density[0]),
+        int(complexity**2 * wall_density[1]),
+    )
 
-    maze_dataset = MazeDataset()
-    print(len(maze_dataset))
-    for i in range(len(maze_dataset)):
-        sample = maze_dataset[i]
-        input_tensor, output_tensor = sample
-        print(input_tensor, output_tensor)
-        print(
-            input_tensor.size(), output_tensor.size()
-        )  # torch.Size([25]) torch.Size([25])
+    num_sample = [100000, 1000]
+    mode = ["train", "test"]
+
+    # file_path = "data/maze/train.json"
+    # generate_maze_dataset(num_samples=100000, n=complexity, num_walls_range=num_walls_range, file_path=file_path)
+
+    for i in range(2):
+        file_path = f"data/maze/n_{complexity}_wall_{wall_density[0]}_{wall_density[1]}/{mode[i]}.json"
+        generate_maze_dataset(
+            num_samples=num_sample[i],
+            n=complexity,
+            num_walls_range=num_walls_range,
+            file_path=file_path,
+        )
+
+    # maze_dataset = MazeDataset()
+    # print(len(maze_dataset))
+    # for i in range(len(maze_dataset)):
+    #    sample = maze_dataset[i]
+    #    input_tensor, output_tensor = sample
+    #    print(input_tensor, output_tensor)
+    #    print(
+    #        input_tensor.size(), output_tensor.size()
+    #    )  # torch.Size([25]) torch.Size([25])

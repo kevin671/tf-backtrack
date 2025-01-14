@@ -2,6 +2,8 @@ import torch
 from torch.utils.data import DataLoader
 
 from dataset.countdown import CountDownDataset
+from dataset.maze import MazeDataset
+from dataset.regex import RegexDataset
 from dataset.sat import SATDataset
 from dataset.seq_align import SequenceAlignmentDataset
 from dataset.sudoku import SudokuDataset
@@ -16,6 +18,10 @@ def get_dataset(args, i):
         return SATDataset(args)
     elif args.dataset_name == "ED":
         return SequenceAlignmentDataset(args, i)
+    elif args.dataset_name == "regex":
+        return RegexDataset(args, i)
+    elif args.dataset_name == "maze":
+        return MazeDataset(args, i)
     else:
         raise ValueError(f"Invalid dataset name: {args.dataset_name}")
 
