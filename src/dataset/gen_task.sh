@@ -9,4 +9,4 @@ source /work/gg45/g45004/.bashrc
 
 conda activate base
 
-python src/dataset/seq_align.py
+python src/dataset/maze.py

@@ -167,8 +167,8 @@ class MazeDataset(Dataset):
 
 
 if __name__ == "__main__":
-    complexity = 9
-    wall_density = [0.2, 0.6]
+    complexity = 13
+    wall_density = [0.4, 0.8]
     num_walls_range = (
         int(complexity**2 * wall_density[0]),
         int(complexity**2 * wall_density[1]),
